@@ -1,0 +1,81 @@
+// This is your Prisma schema file,
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  avatar    String   @default("https://res.cloudinary.com/dy8ef1ngb/image/upload/v1733646752/avatar_szqowp.png")
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  focusSessions FocusSession[]
+  badges        Badge[]
+  streaks       Streak[]
+  FocusMetric   FocusMetric[]
+}
+
+model FocusSession {
+  id        String   @id @default(cuid())
+  userId    String
+  startTime DateTime
+  endTime   DateTime
+  duration  Int
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Streak {
+  id        String    @id @default(cuid())
+  userId    String
+  startDate DateTime
+  endDate   DateTime?
+  isLongest Boolean   @default(false)
+  createdAt DateTime  @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Badge {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  awardedAt   DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+}
+
+model FocusMetric {
+  id           String   @id @default(cuid())
+  userId       String 
+  date         DateTime
+  totalTime    Int
+  sessionCount Int
+  createdAt    DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+}
+
+// Enum for roles
+enum Role {
+  ADMIN
+  USER
+}
