@@ -1,5 +1,5 @@
-import prisma from "@/shared/prisma";
-import redisClient from "@/shared/redis";
+import prisma from "../../../shared/prisma";
+import redisClient from "../../../shared/redis";
 
 const REDIS_PREFIX = "focusMetric";
 

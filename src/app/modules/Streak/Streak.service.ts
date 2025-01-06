@@ -1,4 +1,4 @@
-import prisma from "@/shared/prisma";
+import prisma from "../../../shared/prisma";
 
 const calculateStreaks = async (userId: string) => {
     const focusSessions = await prisma.focusSession.findMany({

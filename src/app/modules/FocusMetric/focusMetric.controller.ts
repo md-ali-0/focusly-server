@@ -1,9 +1,10 @@
 import { Request, Response } from "express";
 import sendResponse from "../../../shared/sendResponse";
 
-import { IAuthUser } from "@/app/interfaces/common";
+
 import { StatusCodes } from "http-status-codes";
 import catchAsync from "../../../shared/catchAsync";
+import { IAuthUser } from "../../interfaces/common";
 import { FocusMetricService } from "./focusMetric.service";
 
 

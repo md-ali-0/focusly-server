@@ -1,7 +1,8 @@
-import { paginationHelper } from "@/helpars/paginationHelper";
-import prisma from "@/shared/prisma";
-import redisClient from "@/shared/redis";
+
 import { FocusSession, Prisma } from "@prisma/client";
+import { paginationHelper } from "../../../helpars/paginationHelper";
+import prisma from "../../../shared/prisma";
+import redisClient from "../../../shared/redis";
 import { IPaginationOptions } from "../../interfaces/pagination";
 
 const REDIS_PREFIX = "focus";
