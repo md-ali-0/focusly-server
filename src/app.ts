@@ -1,7 +1,9 @@
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import express, { Application, NextFunction, Request, Response } from "express";
+import rateLimit from "express-rate-limit";
 import { StatusCodes } from "http-status-codes";
+import winston from 'winston';
 import globalErrorHandler from "./app/middlewares/globalErrorHandler";
 import router from "./app/routes";
 import config from "./config";
@@ -19,6 +21,13 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Rate limiting
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // limit each IP to 100 requests per windowMs
+});
+app.use(limiter);
+
 app.get("/", (req: Request, res: Response) => {
     res.send({
         Message: "Time Management and Focus Tracker API Server Running..",
@@ -27,6 +36,24 @@ app.get("/", (req: Request, res: Response) => {
 
 app.use("/api", router);
 
+// Logger
+const logger = winston.createLogger({
+    level: 'info',
+    format: winston.format.json(),
+    defaultMeta: { service: 'time-management-api' },
+    transports: [
+      new winston.transports.File({ filename: 'error.log', level: 'error' }),
+      new winston.transports.File({ filename: 'combined.log' }),
+    ],
+  })
+  
+  if (process.env.NODE_ENV !== 'production') {
+    logger.add(new winston.transports.Console({
+      format: winston.format.simple(),
+    }))
+  }
+
+  
 app.use(globalErrorHandler);
 
 app.use((req: Request, res: Response, next: NextFunction) => {
