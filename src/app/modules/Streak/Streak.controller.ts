@@ -1,9 +1,8 @@
 import { Request, Response } from "express";
-import sendResponse from "../../../shared/sendResponse";
-
-import { IAuthUser } from "@/app/interfaces/common";
 import { StatusCodes } from "http-status-codes";
 import catchAsync from "../../../shared/catchAsync";
+import sendResponse from "../../../shared/sendResponse";
+import { IAuthUser } from "../../interfaces/common";
 import { StreakService } from "./Streak.service";
 
 const calculateStreaks = catchAsync(async (req: Request   & { user?: IAuthUser }, res: Response) => {
