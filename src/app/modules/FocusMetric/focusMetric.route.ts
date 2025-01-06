@@ -5,10 +5,6 @@ import { FocusMetricController } from "./focusMetric.controller";
 
 const router = Router();
 
-router.get("/", FocusMetricController.getAll);
-router.get("/:id", FocusMetricController.getOne);
-router.post("/", auth(Role.ADMIN),FocusMetricController.create);
-router.patch("/:id", auth(Role.ADMIN),FocusMetricController.update);
-router.delete("/:id", auth(Role.ADMIN),FocusMetricController.remove);
+router.get("/", auth(Role.USER), FocusMetricController.getFocusMetrics);
 
 export const FocusMetricRoutes = router;

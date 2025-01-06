@@ -1,70 +1,24 @@
-import { Request, RequestHandler, Response } from "express";
-import pick from "../../../shared/pick";
+import { Request, Response } from "express";
 import sendResponse from "../../../shared/sendResponse";
 
+import { IAuthUser } from "@/app/interfaces/common";
 import { StatusCodes } from "http-status-codes";
 import catchAsync from "../../../shared/catchAsync";
 import { FocusMetricService } from "./focusMetric.service";
 
-const create = catchAsync(async (req: Request, res: Response) => {
-    const result = await FocusMetricService.create(req.body);
-    sendResponse(res, {
-        statusCode: StatusCodes.OK,
-        success: true,
-        message: "FocusMetric data Created!",
-        data: result,
-    });
-});
 
-const getAll: RequestHandler = catchAsync(
-    async (req: Request, res: Response) => {
-        const filters = pick(req.query, ["name", "searchTerm"]);
-        const options = pick(req.query, [
-            "limit",
-            "page",
-            "sortBy",
-            "sortOrder",
-        ]);
-        const result = await FocusMetricService.getAll(filters, options);
-
-        sendResponse(res, {
-            statusCode: StatusCodes.OK,
-            success: true,
-            message: "FocusMetric data fetched!",
-            meta: result.meta,
-            data: result.data,
-        });
+const getFocusMetrics = catchAsync(async (req: Request  & { user?: IAuthUser }, res: Response) => {
+    if (!req.user?.user) {
+        throw new Error('User not found');
     }
-);
+    const user = req.user;
+    const { date } = req.query;
 
-const getOne = catchAsync(async (req: Request, res: Response) => {
-    const { id } = req.params;
+    if (!date || typeof date !== 'string') {
+        throw new Error('Date parameter is required and must be a string');
+    }
 
-    const result = await FocusMetricService.getOne(id);
-    sendResponse(res, {
-        statusCode: StatusCodes.OK,
-        success: true,
-        message: "FocusMetric data fetched by id!",
-        data: result,
-    });
-});
-
-const update = catchAsync(async (req: Request, res: Response) => {
-    const { id } = req.params;
-
-    const result = await FocusMetricService.update(id, req.body);
-    sendResponse(res, {
-        statusCode: StatusCodes.OK,
-        success: true,
-        message: "FocusMetric data updated!",
-        data: result,
-    });
-});
-
-const remove = catchAsync(async (req: Request, res: Response) => {
-    const { id } = req.params;
-
-    const result = await FocusMetricService.remove(id);
+    const result = await FocusMetricService.getFocusMetrics(user.user, date);
     sendResponse(res, {
         statusCode: StatusCodes.OK,
         success: true,
@@ -73,10 +27,7 @@ const remove = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
+
 export const FocusMetricController = {
-    create,
-    getAll,
-    getOne,
-    update,
-    remove,
+    getFocusMetrics
 };

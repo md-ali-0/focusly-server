@@ -1,136 +1,60 @@
-import { paginationHelper } from "@/helpars/paginationHelper";
 import prisma from "@/shared/prisma";
-import { FocusMetric, Prisma, Streak } from "@prisma/client";
-import { IPaginationOptions } from "../../interfaces/pagination";
 
-// Create a new Streak
-const create = async (payload: any) => {
-    const result = await prisma.streak.create({
-        data: payload,
+const calculateStreaks = async (userId: string) => {
+    const focusSessions = await prisma.focusSession.findMany({
+        where: { userId, status: "COMPLETED" },
+        orderBy: { createdAt: "desc" },
     });
 
-    return result;
-};
-
-// Get all Streaks
-const getAll = async (
-    params: Record<string, unknown>,
-    options: IPaginationOptions
-) => {
-    const { page, limit, skip } = paginationHelper.calculatePagination(options);
-
-    const { searchTerm, ...filterData } = params;
-
-    const andConditions: Prisma.StreakWhereInput[] = [];
-    if (params.searchTerm) {
-        andConditions.push({
-            OR: ["name", "slug"].map((field) => ({
-                [field]: {
-                    contains: params.searchTerm,
-                    mode: "insensitive",
-                },
-            })),
-        });
+    if (!focusSessions.length) {
+        throw new Error("No focus sessions found for the user.");
     }
 
-    if (Object.keys(filterData).length > 0) {
-        andConditions.push({
-            AND: Object.keys(filterData).map((key) => ({
-                [key]: {
-                    equals: (filterData as any)[key],
-                },
-            })),
-        });
+    let currentStreak = 0;
+    let longestStreak = 0;
+    let badges: string[] = [];
+    let prevSessionDate: Date | null = null;
+
+    focusSessions.forEach((session) => {
+        const sessionDate = new Date(session.createdAt);
+
+        if (prevSessionDate === null) {
+            prevSessionDate = sessionDate;
+            currentStreak = 1;
+        } else {
+
+            const diffInDays = (sessionDate.getTime() - prevSessionDate.getTime()) / (1000 * 3600 * 24);
+
+            if (diffInDays === 1) {
+
+                currentStreak += 1;
+            } else if (diffInDays > 1) {
+
+                currentStreak = 1;
+            }
+            prevSessionDate = sessionDate;
+        }
+
+
+        if (currentStreak > longestStreak) {
+            longestStreak = currentStreak;
+        }
+
+
+        if (currentStreak >= 30) badges.push("Gold Badge");
+        else if (currentStreak >= 10) badges.push("Silver Badge");
+        else if (currentStreak >= 5) badges.push("Bronze Badge");
+    });
+
+    const lastSessionDate = focusSessions[0].createdAt;
+    const diffInDays = (new Date().getTime() - new Date(lastSessionDate).getTime()) / (1000 * 3600 * 24);
+    if (diffInDays > 3) {
+        currentStreak = 0;
     }
 
-    const whereConditions: Prisma.StreakWhereInput = { AND: andConditions };
-
-    const result = await prisma.streak.findMany({
-        where: whereConditions,
-        skip,
-        take: limit,
-        orderBy:
-            options.sortBy && options.sortOrder
-                ? {
-                      [options?.sortBy]: options.sortOrder,
-                  }
-                : {
-                      createdAt: "desc",
-                  },
-    });
-
-    const total = await prisma.streak.count({
-        where: whereConditions,
-    });
-
-    const totalPage = Math.ceil(total / limit);
-
-    const response = {
-        meta: {
-            page,
-            limit,
-            total,
-            totalPage,
-        },
-        data: result,
-    };
-
-    return response;
-};
-
-// Get a single Streak by ID with Redis caching
-const getOne = async (id: string): Promise<Streak | null> => {
-
-    const result = await prisma.streak.findUnique({
-        where: {
-            id,
-        },
-    });
-
-    return result;
-};
-
-const update = async (
-    id: string,
-    data: Partial<FocusMetric>
-): Promise<FocusMetric> => {
-    await prisma.focusMetric.findUniqueOrThrow({
-        where: {
-            id,
-        },
-    });
-
-    const result = await prisma.focusMetric.update({
-        where: {
-            id,
-        },
-        data,
-    });
-
-    return result;
-};
-
-// Delete a Streak by ID
-const remove = async (id: string): Promise<Streak | null> => {
-    await prisma.streak.findUniqueOrThrow({
-        where: {
-            id,
-        },
-    });
-
-    const result = await prisma.streak.delete({
-        where: {
-            id,
-        },
-    });
-
-    return result;
+    return { currentStreak, longestStreak, badges };
 };
 
 export const StreakService = {
-    create,
-    getAll,
-    getOne,
-    update,
-    remove,
+    calculateStreaks
 };

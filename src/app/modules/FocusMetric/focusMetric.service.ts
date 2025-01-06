@@ -1,163 +1,95 @@
-import { paginationHelper } from "@/helpars/paginationHelper";
 import prisma from "@/shared/prisma";
 import redisClient from "@/shared/redis";
-import { FocusMetric, Prisma } from "@prisma/client";
-import { IPaginationOptions } from "../../interfaces/pagination";
 
 const REDIS_PREFIX = "focusMetric";
 
-// Create a new focus metric
-const create = async (payload: any) => {
-    const result = await prisma.focusMetric.create({
-        data: payload,
-    });
+const motivationalMessages = [
+    "Great things never come from comfort zones!",
+    "Stay focused and never give up!",
+    "Your hard work is paying off, keep it up!",
+    "Every step forward is a step closer to your goals.",
+    "Believe in yourself and all that you are.",
+    "The future depends on what you do today.",
+    "Discipline is the bridge between goals and achievement.",
+    "Success is the sum of small efforts repeated daily.",
+    "Focus on progress, not perfection.",
+    "You're doing amazing, one step at a time!"
+];
 
-    await redisClient.del(`${REDIS_PREFIX}:all`);
-    return result;
-};
-
-// Get all focus metrics with Redis caching
-const getAll = async (
-    params: Record<string, unknown>,
-    options: IPaginationOptions
-) => {
-    const { page, limit, skip } = paginationHelper.calculatePagination(options);
-
-    const cacheKey = `${REDIS_PREFIX}:all:${JSON.stringify(params)}:${page}:${limit}`;
+const getFocusMetrics = async (userId: string, date: string) => {
+    const cacheKey = `${REDIS_PREFIX}:metrics:${userId}:${date}`;
 
     const cachedData = await redisClient.get(cacheKey);
     if (cachedData) {
         return JSON.parse(cachedData);
     }
 
-    const { searchTerm, ...filterData } = params;
+    const currentDate = new Date(date);
+    const dayOfWeek = currentDate.getDay();
+    const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const startOfWeek = new Date(currentDate.setDate(currentDate.getDate() - diffToMonday));
+    const startOfPeriod = new Date(startOfWeek.setHours(0, 0, 0, 0));
 
-    const andConditions: Prisma.FocusMetricWhereInput[] = [];
-    if (params.searchTerm) {
-        andConditions.push({
-            OR: ["name", "slug"].map((field) => ({
-                [field]: {
-                    contains: params.searchTerm,
-                    mode: "insensitive",
+    const endOfWeek = new Date(startOfPeriod);
+    const endOfPeriod = new Date(endOfWeek.setDate(endOfWeek.getDate() + 6));
+    endOfPeriod.setHours(23, 59, 59, 999);
+
+    const dailyMetrics = await Promise.all(
+        Array.from({ length: 7 }, (_, i) => {
+            const dayStart = new Date(startOfPeriod);
+            dayStart.setDate(startOfPeriod.getDate() + i);
+            const dayEnd = new Date(dayStart);
+            dayEnd.setHours(23, 59, 59, 999);
+
+            return prisma.focusSession.aggregate({
+                _sum: { duration: true },
+                _count: { id: true },
+                where: {
+                    userId,
+                    createdAt: {
+                        gte: dayStart,
+                        lte: dayEnd,
+                    },
                 },
-            })),
-        });
-    }
+            }).then((metrics) => ({
+                date: dayStart.toISOString().split("T")[0],
+                totalFocusTime: metrics._sum.duration || 0,
+                totalSessions: metrics._count.id || 0,
+            }));
+        })
+    );
 
-    if (Object.keys(filterData).length > 0) {
-        andConditions.push({
-            AND: Object.keys(filterData).map((key) => ({
-                [key]: {
-                    equals: (filterData as any)[key],
-                },
-            })),
-        });
-    }
-
-    const whereConditions: Prisma.FocusMetricWhereInput = { AND: andConditions };
-
-    const result = await prisma.focusMetric.findMany({
-        where: whereConditions,
-        skip,
-        take: limit,
-        orderBy:
-            options.sortBy && options.sortOrder
-                ? {
-                      [options?.sortBy]: options.sortOrder,
-                  }
-                : {
-                      createdAt: "desc",
-                  },
+    const weeklyMetrics = await prisma.focusSession.aggregate({
+        _sum: { duration: true },
+        _count: { id: true },
+        where: {
+            userId,
+            createdAt: {
+                gte: startOfPeriod,
+                lte: endOfPeriod,
+            },
+        },
     });
 
-    const total = await prisma.focusMetric.count({
-        where: whereConditions,
-    });
-
-    const totalPage = Math.ceil(total / limit);
+    const motivationalMessage =
+        motivationalMessages[Math.floor(Math.random() * motivationalMessages.length)];
 
     const response = {
-        meta: {
-            page,
-            limit,
-            total,
-            totalPage,
+        daily: dailyMetrics,
+        weekly: {
+            totalFocusTime: weeklyMetrics._sum.duration || 0,
+            totalSessions: weeklyMetrics._count.id || 0,
         },
-        data: result,
+        periodStartDate: startOfPeriod.toISOString(),
+        periodEndDate: endOfPeriod.toISOString(),
+        motivationalMessage,
     };
 
-    await redisClient.set(cacheKey, JSON.stringify(response), { EX: 3600 }); // Cache for 1 hour
+    await redisClient.set(cacheKey, JSON.stringify(response), { EX: 3600 });
 
     return response;
 };
 
-// Get a single focus metric by ID with Redis caching
-const getOne = async (id: string): Promise<FocusMetric | null> => {
-    const cacheKey = `${REDIS_PREFIX}:one:${id}`;
-
-    const cachedData = await redisClient.get(cacheKey);
-    if (cachedData) {
-        return JSON.parse(cachedData);
-    }
-
-    const result = await prisma.focusMetric.findUnique({
-        where: {
-            id,
-        },
-    });
-
-    if (result) {
-        await redisClient.set(cacheKey, JSON.stringify(result), { EX: 3600 });
-    }
-
-    return result;
-};
-
-const update = async (
-    id: string,
-    data: Partial<FocusMetric>
-): Promise<FocusMetric> => {
-    await prisma.focusMetric.findUniqueOrThrow({
-        where: {
-            id,
-        },
-    });
-
-    const result = await prisma.focusMetric.update({
-        where: {
-            id,
-        },
-        data,
-    });
-
-    await redisClient.del(`${REDIS_PREFIX}:one:${id}`);
-    await redisClient.del(`${REDIS_PREFIX}:all`);
-    return result;
-};
-
-// Delete a focus metric by ID
-const remove = async (id: string): Promise<FocusMetric | null> => {
-    await prisma.focusMetric.findUniqueOrThrow({
-        where: {
-            id,
-        },
-    });
-
-    const result = await prisma.focusMetric.delete({
-        where: {
-            id,
-        },
-    });
-
-    await redisClient.del(`${REDIS_PREFIX}:one:${id}`);
-    await redisClient.del(`${REDIS_PREFIX}:all`);
-    return result;
-};
-
 export const FocusMetricService = {
-    create,
-    getAll,
-    getOne,
-    update,
-    remove,
+    getFocusMetrics,
 };

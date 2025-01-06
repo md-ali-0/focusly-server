@@ -5,9 +5,8 @@ import { FocusSessionController } from "./focusSession.controller";
 
 const router = Router();
 
-router.get("/", FocusSessionController.getAll);
-router.get("/:id", FocusSessionController.getOne);
-router.post("/", auth(Role.ADMIN),FocusSessionController.create);
+router.get("/", auth(Role.USER),FocusSessionController.getTotalSessionAndTotalTime);
+router.post("/", auth(Role.USER),FocusSessionController.createFocusSession);
 router.patch("/:id", auth(Role.ADMIN),FocusSessionController.update);
 router.delete("/:id", auth(Role.ADMIN),FocusSessionController.remove);
 

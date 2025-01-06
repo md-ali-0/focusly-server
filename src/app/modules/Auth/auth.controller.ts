@@ -15,6 +15,19 @@ const loginUser = catchAsync(async (req: Request, res: Response) => {
     })
 });
 
+
+const signupUser = catchAsync(async (req: Request, res: Response) => {
+    const result = await AuthServices.signupUser(req.body);
+
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: "Sign Up successfully!",
+        data: result
+    })
+});
+
+
 const changePassword = catchAsync(async (req: Request & { user?: any }, res: Response) => {
     const user = req.user;
 
@@ -56,6 +69,7 @@ const resetPassword = catchAsync(async (req: Request, res: Response) => {
 
 export const AuthController = {
     loginUser,
+    signupUser,
     changePassword,
     forgotPassword,
     resetPassword

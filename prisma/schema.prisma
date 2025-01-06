@@ -22,60 +22,28 @@ model User {
 
   // Relations
   focusSessions FocusSession[]
-  badges        Badge[]
-  streaks       Streak[]
-  FocusMetric   FocusMetric[]
 }
 
 model FocusSession {
-  id        String   @id @default(cuid())
-  userId    String
-  startTime DateTime
-  endTime   DateTime
-  duration  Int
-  createdAt DateTime @default(now())
-
-  // Relations
-  user User @relation(fields: [userId], references: [id])
-}
-
-model Streak {
-  id        String    @id @default(cuid())
-  userId    String
-  startDate DateTime
-  endDate   DateTime?
-  isLongest Boolean   @default(false)
-  createdAt DateTime  @default(now())
-
-  // Relations
-  user User @relation(fields: [userId], references: [id])
-}
-
-model Badge {
   id          String   @id @default(cuid())
   userId      String
-  name        String
-  description String?
-  awardedAt   DateTime @default(now())
+  duration    Int?
+  status      SessionStatus @default(ACTIVE)
+  createdAt   DateTime @default(now())
 
   // Relations
-  user User @relation(fields: [userId], references: [id])
-}
-
-model FocusMetric {
-  id           String   @id @default(cuid())
-  userId       String 
-  date         DateTime
-  totalTime    Int
-  sessionCount Int
-  createdAt    DateTime @default(now())
-
-  // Relations
-  user User @relation(fields: [userId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
 }
 
 // Enum for roles
 enum Role {
   ADMIN
   USER
+}
+
+enum SessionStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
 }

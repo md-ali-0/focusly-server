@@ -5,10 +5,6 @@ import { StreakController } from "./Streak.controller";
 
 const router = Router();
 
-router.get("/", StreakController.getAll);
-router.get("/:id", StreakController.getOne);
-router.post("/", auth(Role.ADMIN),StreakController.create);
-router.patch("/:id", auth(Role.ADMIN),StreakController.update);
-router.delete("/:id", auth(Role.ADMIN),StreakController.remove);
+router.get("/", auth(Role.USER), StreakController.calculateStreaks);
 
 export const StreakRoutes = router;

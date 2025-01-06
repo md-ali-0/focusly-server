@@ -44,6 +44,28 @@ const loginUser = async (payload: { email: string; password: string }) => {
     };
 };
 
+const signupUser = async (payload: {
+    name: string;
+    email: string;
+    password: string;
+    role: Role;
+}) => {
+    const { name, email, password, role } = payload;
+
+    const hashedPassword = bcrypt.hashSync(password, 10);
+
+    const newUser = await prisma.user.create({
+        data: {
+            name,
+            email,
+            password: hashedPassword,
+            role: "USER",
+        },
+    });
+
+    return newUser;
+};
+
 const changePassword = async (
     user: { email: string },
     payload: { oldPassword: string; newPassword: string }
@@ -133,6 +155,7 @@ const resetPassword = async (token: string, payload: { password: string }) => {
 
 export const AuthServices = {
     loginUser,
+    signupUser,
     changePassword,
     forgotPassword,
     resetPassword,

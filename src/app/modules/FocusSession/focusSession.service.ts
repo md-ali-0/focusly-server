@@ -4,14 +4,31 @@ import redisClient from "@/shared/redis";
 import { FocusSession, Prisma } from "@prisma/client";
 import { IPaginationOptions } from "../../interfaces/pagination";
 
-const REDIS_PREFIX = "focusSession";
+const REDIS_PREFIX = "focus";
 
-const create = async (payload: any) => {
+const clearAllCache = async (p0: string) => {
+    const keys = await redisClient.keys(`${REDIS_PREFIX}:all:*`);
+    if (keys.length) {
+        for (const key of keys) {
+            await redisClient.del(key);
+        }
+    }
+};
+
+const createFocusSession = async (id: string, payload: any) => {
+    const { duration } = payload;
+
     const result = await prisma.focusSession.create({
-        data: payload,
+        data: {
+            userId: id,
+            duration: duration,
+            status: "COMPLETED",
+        },
     });
 
-    await redisClient.del(`${REDIS_PREFIX}:all`);
+    // Invalidate user-specific and all-related cache
+    await redisClient.del(`${REDIS_PREFIX}:one:${id}`);
+    await clearAllCache(`${REDIS_PREFIX}:all:*`);
     return result;
 };
 
@@ -20,7 +37,9 @@ const getAll = async (
     options: IPaginationOptions
 ) => {
     const { page, limit, skip } = paginationHelper.calculatePagination(options);
-    const cacheKey = `${REDIS_PREFIX}:all:${JSON.stringify(params)}:${page}:${limit}`;
+    const cacheKey = `${REDIS_PREFIX}:all:${JSON.stringify(
+        params
+    )}:${page}:${limit}`;
 
     const cachedData = await redisClient.get(cacheKey);
     if (cachedData) {
@@ -51,7 +70,9 @@ const getAll = async (
         });
     }
 
-    const whereConditions: Prisma.FocusSessionWhereInput = { AND: andConditions };
+    const whereConditions: Prisma.FocusSessionWhereInput = {
+        AND: andConditions,
+    };
 
     const result = await prisma.focusSession.findMany({
         where: whereConditions,
@@ -88,25 +109,35 @@ const getAll = async (
     return response;
 };
 
-const getOne = async (id: string): Promise<FocusSession | null> => {
-    const cacheKey = `${REDIS_PREFIX}:one:${id}`;
+const getTotalSessionAndTotalTime = async (userId: string) => {
+    const cacheKey = `${REDIS_PREFIX}:one:${userId}`;
 
     const cachedData = await redisClient.get(cacheKey);
     if (cachedData) {
         return JSON.parse(cachedData);
     }
 
-    const result = await prisma.focusSession.findUnique({
+    const result = await prisma.focusSession.findMany({
         where: {
-            id,
+            userId: userId,
+            status: "COMPLETED",
         },
     });
 
-    if (result) {
-        await redisClient.set(cacheKey, JSON.stringify(result), { EX: 3600 });
+    if (!result || result.length === 0) {
+        return null;
     }
 
-    return result;
+    const totalSessions = result.length;
+    const totalFocusTime = result.reduce((total, session) => total + (session.duration || 0), 0);
+    const focusSessionData = {
+        totalSessions,
+        totalFocusTime,
+    };
+
+    await redisClient.set(cacheKey, JSON.stringify(focusSessionData), { EX: 3600 });
+
+    return focusSessionData;
 };
 
 const update = async (
@@ -150,9 +181,9 @@ const remove = async (id: string): Promise<FocusSession | null> => {
 };
 
 export const FocusSessionService = {
-    create,
+    createFocusSession,
     getAll,
-    getOne,
+    getTotalSessionAndTotalTime,
     update,
     remove,
 };
